@@ -1,17 +1,19 @@
 FROM ubuntu:16.04
-MAINTAINER John Starich <johnstarich@johnstarich.com>
+
+# MAINTAINER John Starich <johnstarich@johnstarich.com>
+MAINTAINER Jacob Ingalls <jacob.ingalls@utexas.edu>
 
 # Install set up tools
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninterative \
-        apt-get install -y --no-install-recommends \
+        apt-get install -y \
             curl \
             tar
 
 # Prepare the Pintos directory
 WORKDIR /tmp
 RUN curl -o pintos.tar.gz \
-    -L http://www.stanford.edu/class/cs140/projects/pintos/pintos.tar.gz
+    -L https://www.stanford.edu/class/cs140/projects/pintos/pintos.tar.gz
 RUN tar -xzf pintos.tar.gz && \
     mv ./pintos/src /pintos && \
     rm -rf ./pintos.tar.gz ./pintos
@@ -54,5 +56,10 @@ RUN sed -i 's/\/usr\/class\/cs140\/pintos\/pintos\/src/\/pintos/' /pintos/utils/
     sed -i 's/kernel.bin/\/pintos\/threads\/build\/kernel.bin/' /pintos/utils/pintos && \
     sed -i "s/my (@cmd) = ('qemu');/my (@cmd) = ('qemu-system-x86_64');/" /pintos/utils/pintos && \
     sed -i 's/loader.bin/\/pintos\/threads\/build\/loader.bin/' /pintos/utils/Pintos.pm
+
+# Install additional utils
+COPY utils /pintos_utils
+COPY tests /pintos_tests
+COPY grade.sh /grade.sh
 
 CMD ["sleep", "infinity"]

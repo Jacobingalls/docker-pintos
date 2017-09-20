@@ -1,0 +1,74 @@
+#!/bin/bash
+
+set -e
+
+function error() {
+	echo -e "\033[1;31m$@\033[m" >&2
+}
+
+function success() {
+	echo -e "\033[1;32m$@\033[m"
+}
+
+function usage() {
+	error "Usage: $0 [module] <test> [test [test ...]]"
+}
+
+module=$1
+if [[ "$module" == *"/"* ]] || [ ! -d "/pintos/$module" ]; then
+	module="$(cat /pintos/make_check_module)"
+	tests=$@
+else
+	tests="${@:2}"
+fi
+
+if [ -z "$module" ]; then
+	error "No module specified in make_check_module or command arg"
+	usage
+	exit 2
+fi
+if [ -z "$tests" ]; then
+	error 'No tests specified.'
+	usage
+	exit 2
+fi
+
+if [[ "$RERUN" == 'true' ]]; then
+	for test_to_run in $tests; do
+		rm -f "/pintos/$module/build/tests/$test_to_run.output"
+	done
+fi
+
+set -x
+(cd "/pintos/$module" && make)
+set +x
+
+tests_to_run=""
+errors=""
+for test_to_run in $tests; do
+	test_path="/pintos/$module/build/tests/$test_to_run"
+	tests_to_run+="build/tests/$test_to_run.result "
+done
+
+if [ ! -z "$errors" ]; then
+	exit 2
+fi
+
+set -x
+(cd "/pintos/$module" && make $tests_to_run)
+set +x
+set +e
+for test_to_run in $tests; do
+	test_path="/pintos/$module/build/tests/$test_to_run.result"
+	test_status_failed=$(grep 'FAIL' "$test_path")
+	test_status_success=$(grep 'PASS' "$test_path")
+	if [ ! -z "$test_status_success" ]; then
+		success "$test_to_run passed"
+	else
+		error "$test_to_run failed:"
+		echo -ne "\033[31m"
+		cat "$test_path"
+		echo -ne "\033[m"
+	fi
+done
+

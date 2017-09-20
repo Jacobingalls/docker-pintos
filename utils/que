@@ -1,0 +1,4 @@
+#!/bin/bash
+
+ddd -gdb -debugger pintos-gdb /pintos/$1/build/kernel.o 2>&1 > /dev/null
+

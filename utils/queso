@@ -1,0 +1,39 @@
+#! /bin/bash
+set -x
+set -e
+
+function killeverything {
+	pkill -9 qemu-system-x86
+	pkill -9 gdb
+	pkill -9 ddd
+}
+
+module=$1
+test_name=$2
+
+if [ ! -d "/pintos/$module" ]; then
+	module="$(cat /pintos/make_check_module)"
+	test_name=$1
+fi
+
+if [ -z "$test_name" ]; then
+	echo "No test name provided" >&2
+	exit 2
+fi
+
+trap "killeverything" SIGINT
+
+cd "/pintos/$module" && make
+cd build
+
+unset run_flags
+if [[ "$module" != 'threads' ]]; then
+    run_flags=" -p /pintos/$module/build/tests/$test_name -a $(basename $test_name) -- -f "
+else
+    run_flags=" -- "
+fi
+pintos -v --gdb --filesys-size=2 --swap-size=2 $run_flags run $(basename $test_name) < /dev/null &
+
+ddd -gdb --eval-command="debugpintos"  -debugger pintos-gdb "/pintos/$module/build/kernel.o" 2>&1 > /dev/null &
+
+wait

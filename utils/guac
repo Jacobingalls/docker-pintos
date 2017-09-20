@@ -1,0 +1,92 @@
+#!/bin/bash
+
+set -e
+
+ESCAPE_COLOR=$(echo -e '\033')
+RED="$ESCAPE_COLOR[31m"
+RED_BOLD="$ESCAPE_COLOR[1;31m"
+GREEN="$ESCAPE_COLOR[1;32m"
+RESET_COLOR="$ESCAPE_COLOR[m"
+
+program=$(basename $0)
+
+function error() {
+	echo "${RED}${@}${RESET_COLOR}" >&2
+}
+
+function success() {
+	echo "${GREEN}${@}${RESET_COLOR}" >&2
+}
+
+function usage() {
+	error "Usage: $program PINTOS_MODULE [output errors]"
+	error "  [output errors]: 'true' or 'yes' will also output the errors on failing tests"
+}
+
+function is_true() {
+	return $([[ "$1" -eq 'true' || "$1" -eq 'yes' ]])
+}
+
+DIR=$1
+ERR_OUT=$2
+export MAKEFLAGS=${MAKEFLAGS:="-j 8"}
+
+if [ -z "$DIR" ]; then
+	if [ ! -f /pintos/make_check_module ]; then
+		error 'A pintos module name must be provided'
+		usage
+		exit 2
+	fi
+	DIR="$(cat /pintos/make_check_module)"
+fi
+if [ ! -d "/pintos/$DIR" ]; then
+	error 'The provided pintos module name does not exist in /pintos'
+	usage
+	exit 2
+fi
+
+if [ ! -z "$ERR_OUT" ] && is_true "$ERR_OUT"; then
+	ERR_OUT=0
+else
+	ERR_OUT=1
+fi
+
+# Run make check to ensure the tests have run
+cd "/pintos/$DIR"
+make
+set +e
+make check 2>&1
+set -e
+
+# Run make check again to only print out the test results
+lines=$(make check 2>&- | grep -Ei '^(fail|pass) \S+$')
+
+# Convert tokens into an array
+read -a test_lines <<<$lines
+
+successes=0
+total=0
+
+for ((i = 0; i < ${#test_lines[@]}; i += 2)); do
+	status=${test_lines[$i]}
+	name=${test_lines[$((i + 1))]}
+	if [[ "$status" == 'pass' ]]; then
+		echo "${GREEN}passed${RESET_COLOR}: $name"
+		successes=$((successes + 1))
+	else
+		echo "${RED_BOLD}failed${RESET_COLOR}: $name"
+		if [ "$ERR_OUT" -eq 0 ]; then
+			echo -n "${RED}"
+			cat "./build/$name.result"
+			echo -n "${RESET_COLOR}"
+		fi
+	fi
+	total=$((total + 1))
+done
+
+if [ $total -eq $successes ]; then
+	success "$successes/$total tests passed!"
+else
+	error "$successes/$total tests passed. $((total - successes)) tests still failing."
+fi
+
