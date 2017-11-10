@@ -33,8 +33,6 @@ RUN apt-get update && \
             gdb ddd \
             qemu
 
-# RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 50
-
 # Clean up apt-get's files
 RUN apt-get clean autoclean && \
     rm -rf /var/lib/apt/* /var/lib/cache/* /var/lib/log/*
